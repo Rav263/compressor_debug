@@ -12,9 +12,8 @@
 //#include "ari.h"
 
 enum {
-    CODE_BITS = 48,
-    TABLES_COUNT = 6,
-    UPDATE_CONST = 2,
+    CODE_BITS = 44,
+    TABLES_COUNT = 256,
 };
 
 typedef struct Table {
@@ -27,8 +26,11 @@ typedef struct Table {
     int max_freq;
     int null_const;
     int freq_mult;
+    int to_update;
     int up_const;
-    //    double *logs;
+    int target_up;
+    int next_update;
+    int added_now;
 } Table;
 
 typedef struct File_work_model {
@@ -42,21 +44,19 @@ typedef struct File_work_model {
 //int freqs_mult[] = {1, 5, 15, 17, 64};
 //int null_consts[] = {2, 8, 2, 2, 64};
 
-int max_freqs[] = {13332, 1744, 55000, 65000, 65000, 3500};
-int freqs_mult[] = {21, 7, 21, 11, 66, 71};
-int null_consts[] = {2, 2, 2, 2, 2, 2};
+//int max_freqs[] = {13332, 1744, 55000, 64900, 64000, 3500};
+//int freqs_mult[] = {21, 7, 21, 11, 66, 71};
+//int null_consts[] = {2, 2, 2, 2, 2, 2};
 
 
-//int max_freqs[] = {1000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
-//int freqs_mult[] = {2, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
+//int max_freqs[] = {50000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
+//int freqs_mult[] = {22, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
 //int null_consts[] = {2, 2, 10, 2, 2, 10, 2, 2, 2, 2, 2, 2, 2};
 
 uint64_t TOP_VALUE = (1LL << CODE_BITS) - 1;
 int CHAR_COUNT = 256;
 int char_count = 0;
-
-
-
+int UPDATE_CONST = 2000;
 
 void write_bit(char bit, File_work_model *fwm_out) {
     fwm_out->buffer >>= 1;
@@ -79,10 +79,9 @@ void bits_plus_follow(char bit, File_work_model *fwm_out) {
         write_bit(bit, fwm_out);
     }
 }
-
 void print_arr(int *array) {
     for (int i = 0; i < CHAR_COUNT + 1; i++) {
-        printf("%d ", array[i]);
+        printf("%d: %d ", i, array[i]);
     }
     printf("\n");
 }
@@ -102,6 +101,7 @@ void encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_
         int b = char_sum_freq[char_index-1];
         printf("ERROR: %ld %ld %d %d %d\n", *left, *right, char_index, a, b);
         print_arr(char_sum_freq);
+        //print_arr(char_freq);
         exit(1);
     }
 
@@ -148,28 +148,47 @@ double approx(Table *table) {
     return res / (double)char_sum;
 }
 
-double update_table(int char_index, Table *table) {
-    /*if (table->up_const && char_count > 20000) {
-        table->up_const -= 1;
-        table->char_freq[char_index] += table->freq_mult;
+int update_count(Table *table, int missing) {
+    if (table->next_update) {  /* we have some more before actual rescaling */
+        table->to_update = table->next_update;
+        table->next_update = 0;
         return -1;
+    }
+    if (table->up_const < table->target_up) { /* double rescale interval if needed */   
+        table->up_const <<= 1;
+        if (table->up_const > table->target_up) {
+            table->up_const = table->target_up;
+        }
+    }
+    table->next_update = missing % table->up_const;
+    table->to_update = table->up_const - table->next_update;
+    return 0;
+}
+
+
+double update_table(int char_index, Table *table) {
+    /*int missing = 0;
+    if (table->to_update > 0) {
+        table->to_update -= 1;
+        //if(table->added_now < table->max_freq) {
+            table->char_freq[char_index] += table->freq_mult;
+            table->added_now += table->freq_mult;
+            return -1;
+        //}
     }*/
-    table->up_const = UPDATE_CONST;
     int *char_freq = table->char_freq;
     int *sum_freq = table->char_sum_freq;
     int null_const = table->null_const;
     int freq_mult = table->freq_mult;
-    
-    int min_index = char_index;
+    //missing = *sum_freq;
 
-    char_freq[min_index] += freq_mult;
+    /*int sum = 0;
+    for (int i = CHAR_COUNT + 1; i >= 0; i--) {
+        sum += char_freq[i];
+        sum_freq[i] = sum;
+    }*/
 
-    while (min_index > 0) {
-        min_index -= 1;
-        sum_freq[min_index] += freq_mult;
-    }
-    
-    if (*sum_freq >= table->max_freq){
+    if(*sum_freq >= table->max_freq || table->added_now){
         int sum = 0;
         for (int i = CHAR_COUNT + 1; i >= 0; i--) {
             char_freq[i] = (char_freq[i] + null_const / 2 ) / null_const;
@@ -181,8 +200,18 @@ double update_table(int char_index, Table *table) {
             sum_freq[i] = sum;
         }
     }
-    double mt_wt = approx(table);
-    return mt_wt;
+    //missing -= *sum_freq;
+    
+    //if (update_count(table, missing) < 0) return -1;
+    int min_index = char_index;
+
+    char_freq[min_index] += freq_mult;
+
+    while (min_index > 0) {
+        min_index -= 1;
+        sum_freq[min_index] += freq_mult;
+    }
+    return 0;
 }
 
 void init_table(Table *table, int index) {
@@ -203,10 +232,11 @@ void init_table(Table *table, int index) {
     }
     
     table->char_freq[0] = 0;
-    table->max_freq = max_freqs[index];
-    table->null_const = null_consts[index];
-    table->freq_mult = freqs_mult[index];
-    table->up_const = UPDATE_CONST;
+    table->max_freq = 10000;//max_freqs[index];
+    table->null_const = 2;//null_consts[index];
+    table->freq_mult = 16;//freqs_mult[index];
+    table->target_up  = UPDATE_CONST;
+    table->up_const = CHAR_COUNT >> 5;
 }
 
 
@@ -246,7 +276,7 @@ void add_char(Table *table, int char_index) {
 
 
 void compress_text(FILE *ifp, FILE *ofp) {
-    Table *tables = calloc(TABLES_COUNT, sizeof(*tables));
+    Table *tables = calloc(TABLES_COUNT + 1, sizeof(*tables));
     File_work_model *fwm_out = calloc(1, sizeof(*fwm_out));
 
     fwm_out->now_bit = 8;
@@ -259,34 +289,26 @@ void compress_text(FILE *ifp, FILE *ofp) {
     uint64_t right = TOP_VALUE;
 
     int work_index = 0;
-    double coof = 0;
+    double coof = 0.05;
 
-    for (int i = 0; i < TABLES_COUNT; i++) {
+    uint16_t last_char = 0;
+    for (int i = 0; i < TABLES_COUNT + 1; i++) {
         init_table(&tables[i], i);
     }
     while ((now_char = getc(ifp)) != UINT16_MAX) {
+        work_index = tables[work_index].char_to_index[last_char];
         char_count += 1;
         int char_index = tables[work_index].char_to_index[now_char];
         /*for (int i = 0; i < TABLES_COUNT; i++) {
             add_char(&(tables[i]), char_index);
         }*/
         encode_char(char_index, &right, &left, tables[work_index].char_sum_freq, fwm_out);
-        double max_disp = 0;
-        int max_index = -1;
-
-
-        for (int i = 0; i < TABLES_COUNT; i++) {
-            double now_disp = update_table(char_index, &(tables[i]));
-        
-            if ((now_disp + coof < max_disp || max_index == -1) && now_disp != -1) {
-                max_index = i;
-                max_disp = now_disp;
-            }
-        }
-        
-        if (max_index != -1) work_index = max_index;
+        update_table(char_index, &(tables[work_index]));
+        last_char = now_char;
     }
     encode_char(CHAR_COUNT + 1, &right, &left, tables[work_index].char_sum_freq, fwm_out);
+    tables[work_index].to_update = 0;
+    tables[work_index].next_update = 0;
 
     double now_disp = update_table(CHAR_COUNT + 1, &(tables[work_index]));
     fprintf(stderr, "%lf\n", now_disp);
@@ -387,18 +409,18 @@ void decompress_text(FILE *ifp, FILE *ofp) {
         putc(now_char, ofp);
         double max_disp = 0;
         int max_index = -1;
-
+        double coof = 0.05;
 
         for (int i = 0; i < TABLES_COUNT; i++) {
             double now_disp = update_table(char_index, &(tables[i]));
         
-            if (now_disp < max_disp || max_index == -1) {
+            if ((now_disp + coof < max_disp || max_index == -1) && now_disp != -1) {
                 max_index = i;
                 max_disp = now_disp;
             }
         }
-
-        work_index = max_index;
+        
+        if (max_index != -1) work_index = max_index;
     }
 
     destroy_table(tables);

@@ -27,8 +27,6 @@ typedef struct Table {
     int max_freq;
     int null_const;
     int freq_mult;
-    int to_update;
-    int up_const;
 //    double *logs;
 } Table;
 
@@ -147,17 +145,10 @@ double approx(Table *table) {
 }
 
 double update_table(int char_index, Table *table) {
-    if (table->to_update > 0) {
-        table->to_update -= 1;
-        table->char_freq[char_index] += table->freq_mult;
-        return -1;
-    }
-    //if (table->to_update > 10) fprintf(stderr, "%d\n", table->to_update);
     int *char_freq = table->char_freq;
     int *sum_freq = table->char_sum_freq;
     int null_const = table->null_const;
     int freq_mult = table->freq_mult;
-    int missing = *sum_freq;
 
     if (*sum_freq >= table->max_freq){
         int sum = 0;
@@ -171,12 +162,9 @@ double update_table(int char_index, Table *table) {
             sum_freq[i] = sum;
         }
     }
-    missing -= *sum_freq;
     int min_index = char_index;
 
     char_freq[min_index] += freq_mult;
-    if (missing != 0)table->to_update = table->up_const - missing % table->up_const;
-    //fprintf(stderr, "%d %d\n", table->to_update, missing);
 
     while (min_index > 0) {
         min_index -= 1;
@@ -208,7 +196,6 @@ void init_table(Table *table, int index) {
     table->max_freq = max_freqs[index];
     table->null_const = null_consts[index];
     table->freq_mult = freqs_mult[index];
-    table->up_const = UPDATE_CONST;
 }
 
 

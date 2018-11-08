@@ -18,3 +18,5 @@ echo "processing 7"
 time ./a.out -c ./tests/test_7 ./out/out7
 echo "processing 8"
 time ./a.out -c ./tests/test_8 ./out/out8
+
+ls -al out
