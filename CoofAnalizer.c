@@ -71,13 +71,13 @@ int main(int argc, char *argv[]) {
             fflush(stdout);
             for (int freq_mult = 1; freq_mult < 72; freq_mult += mult_cof) {
                 for (int null_const = 2; null_const < 73; null_const += mult_cof) {
-                    for (int up_const = 2000; up_const < 3000; up_const += up_add_const) {
-                    for (int up_cof = 0; up_cof <= 8; up_cof += 1) {
+                    for (int up_const = 2000; up_const < 2060; up_const += up_add_const) {
+                    for (int up_cof = 1; up_cof <= 8; up_cof += 1) {
                     double mt_wt;
                     int status = 0;
                     int size = compress_ari(some, out_name, freq_max, freq_mult, null_const, &mt_wt, up_const, up_cof, &status);
 
-                    if (status < 0) continue;
+                    if (status > 0) break;
                     if ((size < min_file_size)|| min_file_size == -1) {
                         min_file_size = size;
                         freq_max_min = freq_max;

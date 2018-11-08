@@ -167,8 +167,8 @@ double update_table(int char_index, Table *table) {
                 char_freq[i] = 1; 
             }
 
-            sum_freq[i] = sum;
             sum += char_freq[i];
+            sum_freq[i] = sum;
         }
     }
     missing -= *sum_freq;

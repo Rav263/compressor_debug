@@ -48,14 +48,14 @@ typedef struct File_work_model {
 //int null_consts[] = {2, 2, 2, 2, 2, 2};
 
 
-int max_freqs[] = {10000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
-int freqs_mult[] = {1, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
+int max_freqs[] = {50000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
+int freqs_mult[] = {22, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
 int null_consts[] = {2, 2, 10, 2, 2, 10, 2, 2, 2, 2, 2, 2, 2};
 
 uint64_t TOP_VALUE = (1LL << CODE_BITS) - 1;
 int CHAR_COUNT = 256;
 int char_count = 0;
-int UPDATE_CONST = 2000;
+int UPDATE_CONST = 0;
 
 void write_bit(char bit, File_work_model *fwm_out) {
     fwm_out->buffer >>= 1;
@@ -116,7 +116,7 @@ void encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_
 
 void print_arr(int *array) {
     for (int i = 0; i < CHAR_COUNT + 1; i++) {
-        printf("%d ", array[i]);
+        printf("%d: %d ", i, array[i]);
     }
     printf("\n");
 }
@@ -163,6 +163,7 @@ int update_count(Table *table, int missing) {
 
 
 double update_table(int char_index, Table *table) {
+    int missing = 0;
     if (table->to_update > 0) {
         table->to_update -= 1;
         table->char_freq[char_index] += table->freq_mult;
@@ -172,28 +173,29 @@ double update_table(int char_index, Table *table) {
     int *sum_freq = table->char_sum_freq;
     int null_const = table->null_const;
     int freq_mult = table->freq_mult;
-    int missing = *sum_freq;
+    missing = *sum_freq;
 
-    int sum = 0;
+    /*int sum = 0;
     for (int i = CHAR_COUNT + 1; i >= 0; i--) {
-        sum_freq[i] = sum;
         sum += char_freq[i];
-    }
+        sum_freq[i] = sum;
+    }*/
 
-    missing -= *sum_freq;
-    if (update_count(table, missing) < 0) return -1;
     if (*sum_freq >= table->max_freq){
-        sum = 0;
+        int sum = 0;
         for (int i = CHAR_COUNT + 1; i >= 0; i--) {
             char_freq[i] = (char_freq[i] + null_const / 2 ) / null_const;
             if (char_freq[i] == 0) { 
                 char_freq[i] = 1; 
             }
 
-            sum_freq[i] = sum;
             sum += char_freq[i];
+            sum_freq[i] = sum;
         }
     }
+    missing -= *sum_freq;
+    
+    if (update_count(table, missing) < 0) return -1;
     int min_index = char_index;
 
     char_freq[min_index] += freq_mult;
@@ -202,10 +204,12 @@ double update_table(int char_index, Table *table) {
         min_index -= 1;
         sum_freq[min_index] += freq_mult;
     }
-
+    return -1;
+    }
     double mt_wt = approx(table);
-    //fprintf(stderr, "%lf\n", mt_wt);
-
+    //fprintf(stderr, "%lf %d\n", mt_wt, char_count);
+    //print_arr(table->char_freq);
+    //print_arr(table->char_sum_freq);
     return mt_wt;
 }
 
@@ -231,7 +235,7 @@ void init_table(Table *table, int index) {
     table->null_const = null_consts[index];
     table->freq_mult = freqs_mult[index];
     table->target_up  = UPDATE_CONST;
-    table->up_const = CHAR_COUNT >> 1;
+    table->up_const = CHAR_COUNT >> 5;
 }
 
 

@@ -12,7 +12,7 @@
 //#include "ari.h"
 
 enum {
-    CODE_BITS = 44,
+    CODE_BITS = 48,
     TABLES_COUNT = 1,
 };
 
@@ -98,7 +98,7 @@ int encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_f
     if (*right < *left) {
         int a = char_sum_freq[char_index];
         int b = char_sum_freq[char_index-1];
-        printf("ERROR: %ld %ld %d %d %d\n", *left, *right, char_index, a, b);
+        printf("ERROR: %ld %ld %d %d %d %d %d\n", *left, *right, char_index, a, b, UPDATE_CONST, UP_FIR);
         return -1;
     }
 
@@ -185,7 +185,7 @@ double update_table(int char_index, Table *table) {
         sum_freq[i] = sum;
         sum += char_freq[i];
     }
-
+    
     missing -= *sum_freq;
     if (update_count(table, missing) < 0) return -1;
     if (*sum_freq >= table->max_freq){
@@ -304,6 +304,7 @@ double compress_text(uint16_t *ifp, FILE *ofp, int *status) {
         }*/
         if (encode_char(char_index, &right, &left, tables[work_index].char_sum_freq, fwm_out) < 0){
             *status = 1;
+            return 0;
         }
         double max_disp = 0;
         int max_index = -1;
@@ -454,6 +455,7 @@ int compress_ari(uint16_t *ifile, char *ofile, int max, int mult, int null, doub
     UPDATE_CONST = up_const;
     UP_FIR = up_cof;
     fuck_size = 0;
+    char_count = 0;
 
     *mt_wt = compress_text(ifile, NULL, status);
 
