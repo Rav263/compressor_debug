@@ -85,7 +85,7 @@ void bits_plus_follow(char bit, File_work_model *fwm_out) {
     }
 }
 
-void encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_freq, File_work_model *fwm_out) {
+int encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_freq, File_work_model *fwm_out) {
     uint64_t first_qtr = TOP_VALUE / 4 + 1;
     uint64_t half = first_qtr * 2;
     uint64_t third_qtr = first_qtr * 3;
@@ -99,7 +99,7 @@ void encode_char(int char_index, uint64_t *right, uint64_t *left, int *char_sum_
         int a = char_sum_freq[char_index];
         int b = char_sum_freq[char_index-1];
         printf("ERROR: %ld %ld %d %d %d\n", *left, *right, char_index, a, b);
-        exit(1);
+        return -1;
     }
 
     for (int i = 1;; i++) {
@@ -277,7 +277,7 @@ void add_char(Table *table, int char_index) {
 }
 
 
-double compress_text(uint16_t *ifp, FILE *ofp) {
+double compress_text(uint16_t *ifp, FILE *ofp, int *status) {
     Table *tables = calloc(TABLES_COUNT, sizeof(*tables));
     File_work_model *fwm_out = calloc(1, sizeof(*fwm_out));
 
@@ -302,7 +302,9 @@ double compress_text(uint16_t *ifp, FILE *ofp) {
         /*for (int i = 0; i < TABLES_COUNT; i++) {
             add_char(&(tables[i]), char_index);
         }*/
-        encode_char(char_index, &right, &left, tables[work_index].char_sum_freq, fwm_out);
+        if (encode_char(char_index, &right, &left, tables[work_index].char_sum_freq, fwm_out) < 0){
+            *status = 1;
+        }
         double max_disp = 0;
         int max_index = -1;
 
@@ -323,10 +325,11 @@ double compress_text(uint16_t *ifp, FILE *ofp) {
     tables[work_index].next_update = 0;
 
     double now_disp = update_table(CHAR_COUNT + 1, &(tables[work_index]));
-    fprintf(stderr, "%lf\n", now_disp);
+    //fprintf(stderr, "%lf\n", now_disp);
     end_encoding(left, fwm_out);
     destroy_table(tables);
     free(fwm_out);
+    *status = 0;
     return now_disp;
 }
 
@@ -444,7 +447,7 @@ void decompress_text(FILE *ifp, FILE *ofp) {
 
 
 
-int compress_ari(uint16_t *ifile, char *ofile, int max, int mult, int null, double *mt_wt, int up_const, int up_cof) {
+int compress_ari(uint16_t *ifile, char *ofile, int max, int mult, int null, double *mt_wt, int up_const, int up_cof, int *status) {
     MAX_FREQ = max;
     FREQ_MULT = mult;
     NULL_CONST = null;
@@ -452,7 +455,7 @@ int compress_ari(uint16_t *ifile, char *ofile, int max, int mult, int null, doub
     UP_FIR = up_cof;
     fuck_size = 0;
 
-    *mt_wt = compress_text(ifile, NULL);
+    *mt_wt = compress_text(ifile, NULL, status);
 
     return fuck_size;
 }

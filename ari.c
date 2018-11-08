@@ -13,7 +13,7 @@
 
 enum {
     CODE_BITS = 44,
-    TABLES_COUNT = 12,
+    TABLES_COUNT = 1,
 };
 
 typedef struct Table {
@@ -48,8 +48,8 @@ typedef struct File_work_model {
 //int null_consts[] = {2, 2, 2, 2, 2, 2};
 
 
-int max_freqs[] = {1000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
-int freqs_mult[] = {2, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
+int max_freqs[] = {10000, 1000, 1000, 5000, 5000, 5000, 20000, 20000, 20000, 40000, 40000, 60000, 60000};
+int freqs_mult[] = {1, 30, 60, 2, 30, 60, 2, 30, 60, 30, 30, 30,  60};
 int null_consts[] = {2, 2, 10, 2, 2, 10, 2, 2, 2, 2, 2, 2, 2};
 
 uint64_t TOP_VALUE = (1LL << CODE_BITS) - 1;
@@ -231,7 +231,7 @@ void init_table(Table *table, int index) {
     table->null_const = null_consts[index];
     table->freq_mult = freqs_mult[index];
     table->target_up  = UPDATE_CONST;
-    table->up_const = CHAR_COUNT >> 5;
+    table->up_const = CHAR_COUNT >> 1;
 }
 
 
